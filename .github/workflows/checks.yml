@@ -19,8 +19,7 @@ jobs:
         - python-version: 3.8
           env:
             TOXENV: pylint
-            TOX_PIP_VERSION: 20.3.3
-        - python-version: 3.6
+        - python-version: 3.7
           env:
             TOXENV: typing
         - python-version: "3.10"  # Keep in sync with .readthedocs.yml
@@ -38,8 +37,5 @@ jobs:
     - name: Run check
       env: ${{ matrix.env }}
       run: |
-        if [[ ! -z "$TOX_PIP_VERSION" ]]; then
-            pip install tox-pip-version
-        fi
         pip install -U tox
         tox
