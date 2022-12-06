@@ -10,10 +10,12 @@ module with the ``runserver`` argument::
     python test_engine.py runserver
 """
 
-import os
 import re
+import subprocess
 import sys
 from collections import defaultdict
+from pathlib import Path
+from threading import Timer
 from urllib.parse import urlparse
 from dataclasses import dataclass
 
@@ -125,8 +127,8 @@ class ChangeCloseReasonSpider(TestSpider):
 
 
 def start_test_site(debug=False):
-    root_dir = os.path.join(tests_datadir, "test_site")
-    r = static.File(root_dir)
+    root_dir = Path(tests_datadir, "test_site")
+    r = static.File(str(root_dir))
     r.putChild(b"redirect", util.Redirect(b"/redirected"))
     r.putChild(b"redirected", static.Data(b"Redirected here", "text/plain"))
     numbers = [str(x).encode("utf8") for x in range(2**18)]
@@ -483,6 +485,37 @@ class EngineTest(unittest.TestCase):
             e.start()
             yield e.close()
             self.assertTrue(e.has_capacity())
+
+    def test_short_timeout(self):
+        args = (
+            sys.executable,
+            '-m',
+            'scrapy.cmdline',
+            'fetch',
+            '-s',
+            'CLOSESPIDER_TIMEOUT=0.001',
+            '-s',
+            'LOG_LEVEL=DEBUG',
+            'http://toscrape.com',
+        )
+        p = subprocess.Popen(
+            args,
+            stderr=subprocess.PIPE,
+        )
+
+        def kill_proc():
+            p.kill()
+            p.communicate()
+            assert False, 'Command took too much time to complete'
+
+        timer = Timer(15, kill_proc)
+        try:
+            timer.start()
+            _, stderr = p.communicate()
+        finally:
+            timer.cancel()
+
+        self.assertNotIn(b'Traceback', stderr)
 
 
 if __name__ == "__main__":

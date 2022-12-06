@@ -23,18 +23,25 @@ from tests import NON_EXISTING_RESOLVABLE
 from tests.mockserver import MockServer
 from tests.spiders import (
     AsyncDefAsyncioGenComplexSpider,
+    AsyncDefAsyncioGenExcSpider,
     AsyncDefAsyncioGenLoopSpider,
     AsyncDefAsyncioGenSpider,
     AsyncDefAsyncioReqsReturnSpider,
     AsyncDefAsyncioReturnSingleElementSpider,
     AsyncDefAsyncioReturnSpider,
     AsyncDefAsyncioSpider,
+    AsyncDefDeferredDirectSpider,
+    AsyncDefDeferredMaybeWrappedSpider,
+    AsyncDefDeferredWrappedSpider,
     AsyncDefSpider,
     BrokenStartRequestsSpider,
     BytesReceivedCallbackSpider,
     BytesReceivedErrbackSpider,
+    CrawlSpiderWithAsyncCallback,
+    CrawlSpiderWithAsyncGeneratorCallback,
     CrawlSpiderWithErrback,
     CrawlSpiderWithParseMethod,
+    CrawlSpiderWithProcessRequestCallbackKeywordArguments,
     DelaySpider,
     DuplicateStartRequestsSpider,
     FollowAllSpider,
@@ -344,7 +351,7 @@ with multiples lines
 
     @defer.inlineCallbacks
     def test_crawl_multiple(self):
-        runner = CrawlerRunner({'REQUEST_FINGERPRINTER_IMPLEMENTATION': 'VERSION'})
+        runner = CrawlerRunner({'REQUEST_FINGERPRINTER_IMPLEMENTATION': '2.7'})
         runner.crawl(SimpleSpider, self.mockserver.url("/status?n=200"), mockserver=self.mockserver)
         runner.crawl(SimpleSpider, self.mockserver.url("/status?n=503"), mockserver=self.mockserver)
 
@@ -388,6 +395,26 @@ class CrawlSpiderTestCase(TestCase):
         self.assertIn("[parse] status 202 (foo: bar)", str(log))
 
     @defer.inlineCallbacks
+    def test_crawlspider_with_async_callback(self):
+        crawler = get_crawler(CrawlSpiderWithAsyncCallback)
+        with LogCapture() as log:
+            yield crawler.crawl(mockserver=self.mockserver)
+
+        self.assertIn("[parse_async] status 200 (foo: None)", str(log))
+        self.assertIn("[parse_async] status 201 (foo: None)", str(log))
+        self.assertIn("[parse_async] status 202 (foo: bar)", str(log))
+
+    @defer.inlineCallbacks
+    def test_crawlspider_with_async_generator_callback(self):
+        crawler = get_crawler(CrawlSpiderWithAsyncGeneratorCallback)
+        with LogCapture() as log:
+            yield crawler.crawl(mockserver=self.mockserver)
+
+        self.assertIn("[parse_async_gen] status 200 (foo: None)", str(log))
+        self.assertIn("[parse_async_gen] status 201 (foo: None)", str(log))
+        self.assertIn("[parse_async_gen] status 202 (foo: bar)", str(log))
+
+    @defer.inlineCallbacks
     def test_crawlspider_with_errback(self):
         crawler = get_crawler(CrawlSpiderWithErrback)
         with LogCapture() as log:
@@ -399,6 +426,16 @@ class CrawlSpiderTestCase(TestCase):
         self.assertIn("[errback] status 404", str(log))
         self.assertIn("[errback] status 500", str(log))
         self.assertIn("[errback] status 501", str(log))
+
+    @defer.inlineCallbacks
+    def test_crawlspider_process_request_cb_kwargs(self):
+        crawler = get_crawler(CrawlSpiderWithProcessRequestCallbackKeywordArguments)
+        with LogCapture() as log:
+            yield crawler.crawl(mockserver=self.mockserver)
+
+        self.assertIn("[parse] status 200 (foo: process_request)", str(log))
+        self.assertIn("[parse] status 201 (foo: process_request)", str(log))
+        self.assertIn("[parse] status 202 (foo: bar)", str(log))
 
     @defer.inlineCallbacks
     def test_async_def_parse(self):
@@ -460,6 +497,18 @@ class CrawlSpiderTestCase(TestCase):
 
     @mark.only_asyncio()
     @defer.inlineCallbacks
+    def test_async_def_asyncgen_parse_exc(self):
+        log, items, stats = yield self._run_spider(AsyncDefAsyncioGenExcSpider)
+        log = str(log)
+        self.assertIn("Spider error processing", log)
+        self.assertIn("ValueError", log)
+        itemcount = stats.get_value('item_scraped_count')
+        self.assertEqual(itemcount, 7)
+        for i in range(7):
+            self.assertIn({'foo': i}, items)
+
+    @mark.only_asyncio()
+    @defer.inlineCallbacks
     def test_async_def_asyncgen_parse_complex(self):
         _, items, stats = yield self._run_spider(AsyncDefAsyncioGenComplexSpider)
         itemcount = stats.get_value('item_scraped_count')
@@ -476,6 +525,23 @@ class CrawlSpiderTestCase(TestCase):
         log, *_ = yield self._run_spider(AsyncDefAsyncioReqsReturnSpider)
         for req_id in range(3):
             self.assertIn(f"Got response 200, req_id {req_id}", str(log))
+
+    @mark.only_not_asyncio()
+    @defer.inlineCallbacks
+    def test_async_def_deferred_direct(self):
+        _, items, _ = yield self._run_spider(AsyncDefDeferredDirectSpider)
+        self.assertEqual(items, [{'code': 200}])
+
+    @mark.only_asyncio()
+    @defer.inlineCallbacks
+    def test_async_def_deferred_wrapped(self):
+        log, items, _ = yield self._run_spider(AsyncDefDeferredWrappedSpider)
+        self.assertEqual(items, [{'code': 200}])
+
+    @defer.inlineCallbacks
+    def test_async_def_deferred_maybe_wrapped(self):
+        _, items, _ = yield self._run_spider(AsyncDefDeferredMaybeWrappedSpider)
+        self.assertEqual(items, [{'code': 200}])
 
     @defer.inlineCallbacks
     def test_response_ssl_certificate_none(self):

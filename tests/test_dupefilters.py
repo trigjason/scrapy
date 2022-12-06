@@ -2,8 +2,8 @@ import hashlib
 import tempfile
 import unittest
 import shutil
-import os
 import sys
+from pathlib import Path
 from testfixtures import LogCapture
 
 from scrapy.dupefilters import RFPDupeFilter
@@ -51,7 +51,7 @@ class RFPDupeFilterTest(unittest.TestCase):
     def test_df_from_crawler_scheduler(self):
         settings = {'DUPEFILTER_DEBUG': True,
                     'DUPEFILTER_CLASS': FromCrawlerRFPDupeFilter,
-                    'REQUEST_FINGERPRINTER_IMPLEMENTATION': 'VERSION'}
+                    'REQUEST_FINGERPRINTER_IMPLEMENTATION': '2.7'}
         crawler = get_crawler(settings_dict=settings)
         scheduler = Scheduler.from_crawler(crawler)
         self.assertTrue(scheduler.df.debug)
@@ -60,7 +60,7 @@ class RFPDupeFilterTest(unittest.TestCase):
     def test_df_from_settings_scheduler(self):
         settings = {'DUPEFILTER_DEBUG': True,
                     'DUPEFILTER_CLASS': FromSettingsRFPDupeFilter,
-                    'REQUEST_FINGERPRINTER_IMPLEMENTATION': 'VERSION'}
+                    'REQUEST_FINGERPRINTER_IMPLEMENTATION': '2.7'}
         crawler = get_crawler(settings_dict=settings)
         scheduler = Scheduler.from_crawler(crawler)
         self.assertTrue(scheduler.df.debug)
@@ -68,7 +68,7 @@ class RFPDupeFilterTest(unittest.TestCase):
 
     def test_df_direct_scheduler(self):
         settings = {'DUPEFILTER_CLASS': DirectDupeFilter,
-                    'REQUEST_FINGERPRINTER_IMPLEMENTATION': 'VERSION'}
+                    'REQUEST_FINGERPRINTER_IMPLEMENTATION': '2.7'}
         crawler = get_crawler(settings_dict=settings)
         scheduler = Scheduler.from_crawler(crawler)
         self.assertEqual(scheduler.df.method, 'n/a')
@@ -157,7 +157,7 @@ class RFPDupeFilterTest(unittest.TestCase):
             df.request_seen(r1)
             df.close('finished')
 
-            with open(os.path.join(path, 'requests.seen'), 'rb') as seen_file:
+            with Path(path, 'requests.seen').open('rb') as seen_file:
                 line = next(seen_file).decode()
                 assert not line.endswith('\r\r\n')
                 if sys.platform == 'win32':
@@ -172,7 +172,7 @@ class RFPDupeFilterTest(unittest.TestCase):
         with LogCapture() as log:
             settings = {'DUPEFILTER_DEBUG': False,
                         'DUPEFILTER_CLASS': FromCrawlerRFPDupeFilter,
-                        'REQUEST_FINGERPRINTER_IMPLEMENTATION': 'VERSION'}
+                        'REQUEST_FINGERPRINTER_IMPLEMENTATION': '2.7'}
             crawler = get_crawler(SimpleSpider, settings_dict=settings)
             spider = SimpleSpider.from_crawler(crawler)
             dupefilter = _get_dupefilter(crawler=crawler)
@@ -199,7 +199,7 @@ class RFPDupeFilterTest(unittest.TestCase):
         with LogCapture() as log:
             settings = {'DUPEFILTER_DEBUG': True,
                         'DUPEFILTER_CLASS': FromCrawlerRFPDupeFilter,
-                        'REQUEST_FINGERPRINTER_IMPLEMENTATION': 'VERSION'}
+                        'REQUEST_FINGERPRINTER_IMPLEMENTATION': '2.7'}
             crawler = get_crawler(SimpleSpider, settings_dict=settings)
             spider = SimpleSpider.from_crawler(crawler)
             dupefilter = _get_dupefilter(crawler=crawler)
@@ -233,7 +233,7 @@ class RFPDupeFilterTest(unittest.TestCase):
     def test_log_debug_default_dupefilter(self):
         with LogCapture() as log:
             settings = {'DUPEFILTER_DEBUG': True,
-                        'REQUEST_FINGERPRINTER_IMPLEMENTATION': 'VERSION'}
+                        'REQUEST_FINGERPRINTER_IMPLEMENTATION': '2.7'}
             crawler = get_crawler(SimpleSpider, settings_dict=settings)
             spider = SimpleSpider.from_crawler(crawler)
             dupefilter = _get_dupefilter(crawler=crawler)
